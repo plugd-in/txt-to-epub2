@@ -134,9 +134,8 @@ void parse_input (FILE * input, List * sectionList, char * delim) {
         } else if ( !emptyLine ) { // Ignore multiple new-lines.
             // Handle the delimiter line.
             if ( delim != NULL && strcmp(delim, line->str) == 0) {
-                g_string_free(line, 1); // We don't need to save the delimiter line.
                 append_list(sectionList, section);
-
+                g_string_free(line, 1); // We don't need to save the delimiter line.
                 section = malloc(sizeof(Section));
                 section->title = "Default Title";
                 section->bodyElements = malloc(sizeof(List));
@@ -243,7 +242,7 @@ int main (int argc, char** argv) {
     for ( Node * current = sectionList.head ; current != NULL; current = current->next) {
         GString * str = g_string_new("");
         Section * section = current->data;
-        sprintf(path, "%s/OEBPS/Text/Section%d.html", uuid, idx);
+        sprintf(path, "%s/OEBPS/Text/Section%d.xhtml", uuid, idx);
         FILE * newFile = fopen(path, "w+");
         for (Node * bNode = section->bodyElements->head; bNode != NULL; bNode = bNode->next) {
             g_string_append(str, ((GString*)bNode->data)->str);
@@ -288,9 +287,9 @@ int main (int argc, char** argv) {
             free(tmp);
         }
         free(section->bodyElements);
-        free(section->title);
+        if (strcmp(section->title, "Default Title") != 0 ) free(section->title);
         current = current->next;
-        free(current);
+        free(tmpCurrent);
     }
 
     printf("Title: %s\n", arguments.title);
