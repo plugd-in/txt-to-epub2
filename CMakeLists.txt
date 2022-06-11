@@ -8,7 +8,7 @@ set(CMAKE_C_STANDARD 11)
 set( CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(deps REQUIRED IMPORTED_TARGET glib-2.0)
+pkg_check_modules(deps REQUIRED IMPORTED_TARGET glib-2.0 uuid)
 
 add_executable(txt-to-epub txt-to-epub.c)
 

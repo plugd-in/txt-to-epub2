@@ -4,6 +4,12 @@
 #include <stdlib.h>
 #include <glib.h>
 #include <argp.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <uuid/uuid.h>
+
+
+struct stat st = {0};
 
 const char * argp_program_version = "txt-to-epub 0.1.0";
 
@@ -13,7 +19,7 @@ static char args_doc[] = "[INPUT FILE...]";
 static struct argp_option options[] = {
     {"output", 'o', "FILE", 0, "Output to FILE instead of Standard Output."},
     {"title", 't', "TITLE", 0, "Title of the document."},
-    {"delim", 'd', "delimiter", 0, "Delimiter of the input file. Splits input files into subsequent sections. By default, the entire input file is consumed as a section."},
+    {"delim", 'd', "delimiter", 0, "Delimiter of the input file. Splits input files into subsequent sections. By default, the entire input file is consumed as a section. Note, the delimiter should be the only line contents."},
     { 0 }
 };
 
@@ -50,7 +56,27 @@ void append_list (List * list, void * data) {
     list->len += 1;
 }
 
-
+void prepend_list (List * list, void * data) {
+    Node * next = (Node*) malloc(sizeof(Node));
+    next->data = data;
+    if ( list->head == NULL ) {
+        list->head = next;
+        next->next = NULL;
+        next->prev = NULL;
+    } else if ( list->tail == NULL ) {
+        list->tail = list->head;
+        list->head = next;
+        next->next = list->tail;
+        list->tail->prev = next;
+        next->prev = NULL;
+    } else {
+        next->next = list->head;
+        next->prev = NULL;
+        list->head->prev = next;
+        list->head = next;
+    }
+    list->len += 1;
+}
 
 struct arguments {
     List * inputFiles;
@@ -89,7 +115,66 @@ typedef struct Section {
     List * bodyElements; // List<Gstring *>;
 } Section;
 
+// Assume that the first line in a section is the section title.
+void parse_input (FILE * input, List * sectionList, char * delim) {
+    Section * section = malloc(sizeof(Section));
+    section->title = "Default Title";
+    section->bodyElements = malloc(sizeof(List));
+    section->bodyElements->head = NULL;
+    section->bodyElements->tail = NULL;
+    section->bodyElements->len = 0;
+    // First line is styled as a header.
+    GString * line = g_string_new("");
+    int emptyLine = 1;
+    int c;
+    while ( (c = fgetc(input)) != EOF ) {
+        if ( c != '\n') {
+            g_string_append_c(line, c);
+            emptyLine = 0;
+        } else if ( !emptyLine ) { // Ignore multiple new-lines.
+            // Handle the delimiter line.
+            if ( delim != NULL && strcmp(delim, line->str) == 0) {
+                g_string_free(line, 1); // We don't need to save the delimiter line.
+                append_list(sectionList, section);
 
+                section = malloc(sizeof(Section));
+                section->title = "Default Title";
+                section->bodyElements = malloc(sizeof(List));
+                section->bodyElements->head = NULL;
+                section->bodyElements->tail = NULL;
+                section->bodyElements->len = 0;
+
+                line = g_string_new("");
+                emptyLine = 1;
+                continue;
+            }
+            if ( section->bodyElements->len == 0 ) { // This indicates the first ("title") line.
+                section->title = strcpy(malloc(sizeof(char)*line->len), line->str);
+                g_string_prepend(line, "<h2>");
+                g_string_append(line, "</h2>\n");
+                append_list(section->bodyElements, line);
+                line = g_string_new("");
+                emptyLine = 1;
+            } else {
+                g_string_prepend(line, "<p>");
+                g_string_append(line, "</p>\n");
+                append_list(section->bodyElements, line);
+                line = g_string_new("");
+                emptyLine = 1;
+            }
+
+        }
+    }
+    if ( section->bodyElements->len > 0 ) append_list(sectionList, section);
+    else if ( line->len > 0 ) {
+        // IDK why someone would want just a title/header line in a section... but whatever.
+        section->title = line->str;
+        g_string_prepend(line, "<h2>");
+        g_string_append(line, "</h2>\n");
+        append_list(section->bodyElements, line);
+        append_list(sectionList, section);
+    } else g_string_free(line, 1);
+}
 
 int main (int argc, char** argv) {
     // Arguments
@@ -120,9 +205,63 @@ int main (int argc, char** argv) {
     sectionList.tail = NULL;
     sectionList.len = 0;
 
+    // Parse all the input files.
+    for ( Node * current = inputList.head; current != NULL; current = current->next ) {
+        parse_input(current->data, &sectionList, arguments.delimiter);
+    }
+
+    uuid_t raw_uuid;
+    uuid_generate_random(raw_uuid);
+
+    // 36 characters for uuid, 5 for "/tmp/", and 1 for '\0'.
+    char * uuid = malloc(sizeof(char)*(37 + 5));
+    char * path = malloc(sizeof(char)*(37+5+30));
+    strcpy(uuid, "/tmp/");
+    uuid_unparse(raw_uuid, uuid + 5);
+    sprintf(path, "%s/OEBPS", uuid);
 
 
+    // Create the tmp directory.
+    if ( stat(uuid, &st) == -1 ) {
+        // Make /tmp/uuid
+        mkdir(uuid, 0700);
+        // Make /tmp/uuid/OEBPS
+        mkdir(path, 0700);
+        sprintf(path, "%s/OEBPS/Text", uuid);
+        // Make /tmp/uuid/OEBPS/Text
+        mkdir(path, 0700);
+        sprintf(path, "%s/OEBPS/Styles", uuid);
+        // Make /tmp/uuid/OEBPS/Styles
+        mkdir(path, 0700);
+    } else {
+        fprintf(stderr, "Error creating the EPub Document Directory");
+        return 1;
+    }
     
+    int idx = 1;
+    // Write the section/chapter files.
+    for ( Node * current = sectionList.head ; current != NULL; current = current->next) {
+        GString * str = g_string_new("");
+        Section * section = current->data;
+        sprintf(path, "%s/OEBPS/Text/Section%d.html", uuid, idx);
+        FILE * newFile = fopen(path, "w+");
+        for (Node * bNode = section->bodyElements->head; bNode != NULL; bNode = bNode->next) {
+            g_string_append(str, ((GString*)bNode->data)->str);
+        }
+        fprintf(newFile, "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+        "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.1//EN\" \"http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd\">\n"
+        "<html xmlns=\"http://www.w3.org/1999/xhtml\">\n"
+        "<head>\n"
+        "  <title>%s</title>\n"
+        "</head>\n"
+        "<body>\n"
+        "%s"
+        "</body>\n"
+        "</html>\n", section->title, str->str);
+        g_string_free(str, 1);
+        idx++;
+    }
+
     // Program cleanup
     // Close file streams.
     for ( Node * current = inputList.head; current != NULL; current = current->next) {
@@ -132,6 +271,27 @@ int main (int argc, char** argv) {
 
     // Close output stream.
     if ( arguments.outputFile != stdout ) fclose(arguments.outputFile);
+
+    free(uuid);
+    free(path);
+
+    Node * current = sectionList.head;
+    // Free the sections.
+    while (current != NULL) {
+        Section * section = current->data;
+        Node * bNode = section->bodyElements->head;
+        Node * tmpCurrent = current;
+        while ( bNode != NULL ) {
+            Node * tmp = bNode;
+            bNode = tmp->next;
+            g_string_free(tmp->data, 1);
+            free(tmp);
+        }
+        free(section->bodyElements);
+        free(section->title);
+        current = current->next;
+        free(current);
+    }
 
     printf("Title: %s\n", arguments.title);
     printf("Delimiter: %s\n", arguments.delimiter == NULL ? "No Delimiter" : arguments.delimiter);
