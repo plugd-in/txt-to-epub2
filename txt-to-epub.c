@@ -150,13 +150,13 @@ void parse_input (FILE * input, List * sectionList, char * delim) {
             }
             if ( section->bodyElements->len == 0 ) { // This indicates the first ("title") line.
                 section->title = strcpy(malloc(sizeof(char)*line->len), line->str);
-                g_string_prepend(line, "<h2>");
+                g_string_prepend(line, "\t<h2>");
                 g_string_append(line, "</h2>\n");
                 append_list(section->bodyElements, line);
                 line = g_string_new("");
                 emptyLine = 1;
             } else {
-                g_string_prepend(line, "<p>");
+                g_string_prepend(line, "\t<p>");
                 g_string_append(line, "</p>\n");
                 append_list(section->bodyElements, line);
                 line = g_string_new("");
@@ -169,7 +169,7 @@ void parse_input (FILE * input, List * sectionList, char * delim) {
     else if ( line->len > 0 ) {
         // IDK why someone would want just a title/header line in a section... but whatever.
         section->title = line->str;
-        g_string_prepend(line, "<h2>");
+        g_string_prepend(line, "\t<h2>");
         g_string_append(line, "</h2>\n");
         append_list(section->bodyElements, line);
         append_list(sectionList, section);
