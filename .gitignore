@@ -8,3 +8,5 @@ Makefile
 
 test.txt
 CMakeCache.txt
+
+install_manifest.txt

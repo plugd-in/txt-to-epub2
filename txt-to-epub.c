@@ -20,9 +20,10 @@ static char doc[] = "txt-to-epub - Transform .txt document(s) to an epub documen
 static char args_doc[] = "[INPUT FILE...]";
 
 static struct argp_option options[] = {
-    {"output", 'o', "FILE", 0, "Output to FILE instead of Standard Output."},
-    {"title", 't', "TITLE", 0, "Title of the document."},
+    {"output", 'o', "FILE", 0, "Output to FILE. Defaults to ./<Document Title>.epub"},
+    {"title", 't', "TITLE", 0, "Title of the document. Defaults to \"EPUB Title\""},
     {"keep", 'k', 0, 0, "Keep the construction directory."},
+    {"verbose", 'v', 0, 0, "Include verbose output.."},
     {"delim", 'd', "delimiter", 0, "Delimiter of the input file. Splits input files into subsequent sections. By default, the entire input file is consumed as a section. Note, the delimiter should be the only line contents."},
     { 0 }
 };
@@ -98,6 +99,7 @@ struct arguments {
     char * title;
     char * delimiter;
     bool keep;
+    bool verbose;
 };
 
 static error_t parse_opt (int key, char *arg, struct argp_state * state) {
@@ -115,6 +117,9 @@ static error_t parse_opt (int key, char *arg, struct argp_state * state) {
             break;
         case 'k':
             arguments->keep = TRUE;
+            break;
+        case 'v':
+            arguments->verbose = TRUE;
             break;
         case ARGP_KEY_ARG:
             append_list(arguments->inputFiles, fopen(arg, "r"));
@@ -204,9 +209,10 @@ int main (int argc, char** argv) {
     arguments.inputFiles = &inputList;
     // Default to STDOUT
     arguments.outputFile = stdout;
-    arguments.title = "EPub Title";
+    arguments.title = "EPUB Title";
     arguments.delimiter = NULL; // By default, consume the entire input as a section.
     arguments.keep = FALSE;
+    arguments.verbose = FALSE;
 
     // Argument Parsing
     argp_parse(&argp, argc, argv, 0, 0, &arguments);
@@ -275,6 +281,8 @@ int main (int argc, char** argv) {
         "%s"
         "</body>\n"
         "</html>\n", section->title, str->str);
+        // Verbose output: Chapter Title
+        if ( arguments.verbose ) printf("Added Chapter: %s\n", section->title);
         g_string_free(str, 1);
         idx++;
     }
@@ -307,6 +315,8 @@ int main (int argc, char** argv) {
         current = current->next;
         free(tmpCurrent);
     }
+
+    if ( arguments.keep ) printf("Construction Directory: %s\n", uuid);
 
     // Remove the epub directory.
     if ( !arguments.keep ) rmrf(uuid);
