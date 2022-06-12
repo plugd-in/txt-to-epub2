@@ -7,11 +7,14 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <uuid/uuid.h>
+#include <stdbool.h>
 
+#define __USE_XOPEN_EXTENDED 1
+#include <ftw.h>
 
 struct stat st = {0};
 
-const char * argp_program_version = "txt-to-epub 0.1.0";
+const char * argp_program_version = "txt-to-epub 0.2.0";
 
 static char doc[] = "txt-to-epub - Transform .txt document(s) to an epub document.";
 static char args_doc[] = "[INPUT FILE...]";
@@ -19,6 +22,7 @@ static char args_doc[] = "[INPUT FILE...]";
 static struct argp_option options[] = {
     {"output", 'o', "FILE", 0, "Output to FILE instead of Standard Output."},
     {"title", 't', "TITLE", 0, "Title of the document."},
+    {"keep", 'k', 0, 0, "Keep the construction directory."},
     {"delim", 'd', "delimiter", 0, "Delimiter of the input file. Splits input files into subsequent sections. By default, the entire input file is consumed as a section. Note, the delimiter should be the only line contents."},
     { 0 }
 };
@@ -78,11 +82,22 @@ void prepend_list (List * list, void * data) {
     list->len += 1;
 }
 
+int handle_remove (const char* path, const struct stat * sb, int flag, struct FTW * ftwbuf) {
+    int ret = remove(path);
+    if ( ret ) fprintf(stderr, "%s", path);
+    return ret;
+}
+
+int rmrf (char * path) { // Recursive remove.
+    return nftw(path, handle_remove, 10, FTW_DEPTH);
+}
+
 struct arguments {
     List * inputFiles;
     FILE * outputFile;
     char * title;
     char * delimiter;
+    bool keep;
 };
 
 static error_t parse_opt (int key, char *arg, struct argp_state * state) {
@@ -97,6 +112,9 @@ static error_t parse_opt (int key, char *arg, struct argp_state * state) {
             break;
         case 'd':
             arguments->delimiter = arg;
+            break;
+        case 'k':
+            arguments->keep = TRUE;
             break;
         case ARGP_KEY_ARG:
             append_list(arguments->inputFiles, fopen(arg, "r"));
@@ -188,7 +206,7 @@ int main (int argc, char** argv) {
     arguments.outputFile = stdout;
     arguments.title = "EPub Title";
     arguments.delimiter = NULL; // By default, consume the entire input as a section.
-
+    arguments.keep = FALSE;
 
     // Argument Parsing
     argp_parse(&argp, argc, argv, 0, 0, &arguments);
@@ -271,8 +289,6 @@ int main (int argc, char** argv) {
     // Close output stream.
     if ( arguments.outputFile != stdout ) fclose(arguments.outputFile);
 
-    free(uuid);
-    free(path);
 
     Node * current = sectionList.head;
     // Free the sections.
@@ -291,6 +307,11 @@ int main (int argc, char** argv) {
         current = current->next;
         free(tmpCurrent);
     }
+
+    // Remove the epub directory.
+    if ( !arguments.keep ) rmrf(uuid);
+    free(uuid);
+    free(path);
 
     printf("Title: %s\n", arguments.title);
     printf("Delimiter: %s\n", arguments.delimiter == NULL ? "No Delimiter" : arguments.delimiter);
