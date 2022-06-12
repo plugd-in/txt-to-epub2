@@ -12,7 +12,7 @@ Convert a delimited or un-delimited collection of text files into an EPUB file.
 
 ## Usage 
 ``` 
-Usage: txt-to-epub [OPTION...] [INPUT FILE...]
+Usage: txt-to-epub2 [OPTION...] [INPUT FILE...]
 txt-to-epub - Transform .txt document(s) to an epub document.
 
   -d, --delim=delimiter      Delimiter of the input file. Splits input files
