@@ -42,7 +42,6 @@ $ cat test.txt
 $ text-to-epub2 -d "<------>" -t "Test EPub" test.txt
   Title: Test EPub
   Delimiter: <------>
-$ 
 ```  
 #### Scenario 2: Creating a .epub from a list of input files.  
 ```
@@ -52,7 +51,6 @@ $ ls
 $ text-to-epub2 -t "Test EPub" 1.txt 2.txt 
   Title: Test EPub
   Delimiter: No Delimiter
-$
 ```  
 #### Scenario 3: Mix of delimited files and non-delimited files.
 ```
@@ -71,7 +69,6 @@ $ cat 2.txt
 $ text-to-epub2 -d "<------>" 1.txt 2.txt
   Title: EPub Title
   Delimiter: <------>
-$
 ```
 #### Scenario 4: Text from Standard Input.
 ```
