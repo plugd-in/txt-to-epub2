@@ -1,7 +1,7 @@
 # txt-to-epub2
 Convert a delimited or un-delimited collection of text files into an EPUB file.
 
-## WARNING Project incomplete.
+## WARNING Project incomplete. Version 0.2.0
 
 ## Build 
 1. Run `cmake .` to generate make files.
