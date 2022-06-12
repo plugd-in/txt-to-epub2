@@ -29,3 +29,12 @@ txt-to-epub - Transform .txt document(s) to an epub document.
 Mandatory or optional arguments to long options are also mandatory or optional
 for any corresponding short options.
 ```
+
+## Feature List/Todo
+- [x] Parse files.
+- [x] Support Delimiters
+- [x] Create construction directories. 
+- [x] Support multiple input files.
+- [ ] Generate Table of Contents.
+- [ ] Generate metadata.
+- [ ] Inmplement compression/file creation to output file.
