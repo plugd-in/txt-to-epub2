@@ -30,6 +30,65 @@ Mandatory or optional arguments to long options are also mandatory or optional
 for any corresponding short options.
 ```
 
+### Examples  
+#### Scenario 1: Creating a .epub from a single, delimited ("<------>") text file.
+```
+$ cat test.txt
+  Title 1
+  Hello, world!
+  <------>
+  Title 2
+  Goodbye, world!
+$ text-to-epub2 -d "<------>" -t "Test EPub" test.txt
+  Title: Test EPub
+  Delimiter: <------>
+$ 
+```  
+#### Scenario 2: Creating a .epub from a list of input files.  
+```
+$ ls
+  1.txt
+  2.txt
+$ text-to-epub2 -t "Test EPub" 1.txt 2.txt 
+  Title: Test EPub
+  Delimiter: No Delimiter
+$
+```  
+#### Scenario 3: Mix of delimited files and non-delimited files.
+```
+$ ls
+  1.txt
+  2.txt
+$ cat 1.txt
+  Title 1
+  Hello, world!
+  <------>
+  Title 2
+  Goodbye, world!
+$ cat 2.txt
+  Title 3
+  I forgot, my keys. Goodbye again.
+$ text-to-epub2 -d "<------>" 1.txt 2.txt
+  Title: EPub Title
+  Delimiter: <------>
+$
+```
+#### Scenario 4: Text from Standard Input.
+```
+$ cat 1.txt
+  Title 1
+  Hello, world!
+  <------>
+  Title 2
+  Goodbye, world!
+$ cat 2.txt
+  Title 3
+  I forgot, my keys. Goodbye again.
+$ cat 1.txt <(echo "<------>") 2.txt | txt-to-epub2 -d "<------>" -t "Title"
+  Title: Title
+  Delimiter: <------>
+```  
+
 ## Feature List/Todo
 - [x] Parse files.
 - [x] Support Delimiters
