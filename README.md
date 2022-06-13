@@ -91,7 +91,7 @@ $ cat 1.txt <(echo "<------>") 2.txt | txt-to-epub2 -d "<------>" -t "Title"
 - [x] Support Delimiters
 - [x] Create construction directories. 
 - [x] Support multiple input files.
-- [ ] Generate Table of Contents.
+- [x] Generate Table of Contents.
 - [ ] Generate metadata.
 - [ ] Inmplement compression/file creation to output file.
 - [x] More useful output: Chapter titles and/or chapter count.
