@@ -95,5 +95,5 @@ $ cat 1.txt <(echo "<------>") 2.txt | txt-to-epub2 -d "<------>" -t "Title"
 - [x] Support multiple input files.
 - [x] Generate Table of Contents.
 - [ ] Generate metadata.
-- [ ] Inmplement compression/file creation to output file.
+- [x] Inmplement compression/file creation to output file.
 - [x] More useful output: Chapter titles and/or chapter count.
