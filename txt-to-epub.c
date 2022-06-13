@@ -187,7 +187,13 @@ void parse_input (FILE * input, List * sectionList, char * delim) {
     int c;
     while ( (c = fgetc(input)) != EOF ) {
         if ( c != '\n') {
-            g_string_append_c(line, c);
+            if ( c == '<' )
+                g_string_append(line, "&lt;");
+            else if (c == '>' )
+                g_string_append(line, "&gt;");
+            else if ( c == '&' ) 
+                g_string_append(line, "&amp;");
+            else g_string_append_c(line, c);
             emptyLine = 0;
         } else if ( !emptyLine ) { // Ignore multiple new-lines.
             // Handle the delimiter line.
