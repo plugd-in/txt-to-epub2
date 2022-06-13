@@ -14,9 +14,11 @@
 #define __USE_XOPEN_EXTENDED 1
 #include <ftw.h>
 
+#define TXT_TO_BODY_VERSION "1.0.0"
+
 struct stat st = {0};
 
-const char * argp_program_version = "txt-to-epub 0.2.0";
+const char * argp_program_version = "txt-to-epub " TXT_TO_BODY_VERSION;
 
 static char doc[] = "txt-to-epub - Transform .txt document(s) to an epub document.";
 static char args_doc[] = "[INPUT FILE...]";
