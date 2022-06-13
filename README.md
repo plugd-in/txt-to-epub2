@@ -1,5 +1,5 @@
 # txt-to-epub2
-Convert a delimited or un-delimited collection of text files into an EPUB file.
+Convert a delimited or un-delimited collection of text files into an EPUB file. Compatible with Unix Systems.
 
 ## Build 
 1. Run `cmake .` to generate make files.
@@ -8,7 +8,7 @@ Convert a delimited or un-delimited collection of text files into an EPUB file.
 4. To move the file into a binary path, execute `mkdir -p ~/.local/bin` and `export PATH="$PATH:~/.local/bin"`.
 5. To make the path change persistent, add the updated PATH environment variable to the .bashrc: `echo "export PATH=\"\$PATH:~/.local/bin\"" >> ~/.bashrc`  
 
-#### Dependencies
+#### Build Dependencies
 * libzip
 * glib
 * uuid
