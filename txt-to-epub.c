@@ -40,6 +40,11 @@ typedef struct List {
     int len;
 } List;
 
+struct SectionTitlePair {
+    char * sectionPath;
+    char * sectionTitle;
+};
+
 void append_list (List * list, void * data) {
     Node * next = (Node*) malloc(sizeof(Node));
     next->data = data;
@@ -266,9 +271,10 @@ int main (int argc, char** argv) {
 
     // 36 characters for uuid, 5 for "/tmp/", and 1 for '\0'.
     char * uuid = malloc(sizeof(char)*(37 + 5));
+    char * rawUUID = uuid + 5;
     char * path = malloc(sizeof(char)*(37+5+30));
     strcpy(uuid, "/tmp/");
-    uuid_unparse(raw_uuid, uuid + 5);
+    uuid_unparse(raw_uuid, rawUUID); // Note rawUUID = uuid + 5
     sprintf(path, "%s/OEBPS", uuid);
 
 
@@ -289,7 +295,7 @@ int main (int argc, char** argv) {
         return 1;
     }
     
-    List filenameList; // Will hold the path(s) to the sections ("Text/Section1.xhtml")
+    List filenameList; // List<struct SectionTitlePair*>
     filenameList.head = NULL;
     filenameList.tail = NULL;
     filenameList.len = 0;
@@ -300,6 +306,15 @@ int main (int argc, char** argv) {
         GString * str = g_string_new("");
         Section * section = current->data;
         sprintf(path, "%s/OEBPS/Text/Section%d.xhtml", uuid, idx);
+
+        // Make sure to keep the section path relative to OEBPS
+        struct SectionTitlePair * sectionPair = malloc(sizeof(struct SectionTitlePair));
+        char * sectionPath = malloc(sizeof(char)*(strlen(path+strlen(uuid))+8)); // Allocate enough past uuid/OEPBS
+        sectionPair->sectionPath = sectionPath;
+        sectionPair->sectionTitle = section->title; // !!!! Be careful of FREE ORDER !!!!
+        strcpy(sectionPath, path+strlen(uuid)+7);
+        append_list(&filenameList, sectionPair);
+
         FILE * newFile = fopen(path, "w+");
         for (Node * bNode = section->bodyElements->head; bNode != NULL; bNode = bNode->next) {
             g_string_append(str, ((GString*)bNode->data)->str);
@@ -317,8 +332,38 @@ int main (int argc, char** argv) {
         // Verbose output: Chapter Title
         if ( arguments.verbose ) printf("Added Chapter: %s\n", section->title);
         g_string_free(str, 1);
+        fclose(newFile);
         idx++;
     }
+
+    // Write TOC
+    sprintf(path, "%s/OEBPS/toc.ncx", uuid);
+    FILE * toc = fopen(path, "w+");
+    fprintf(toc, "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+        "<!DOCTYPE ncx PUBLIC \"-//NISO//DTD ncx 2005-1//EN\" \"http://www.daisy.org/z3986/2005/ncx-2005-1.dtd\">\n"
+        "<ncx xmlns=\"http://www.daisy.org/z3986/2005/ncx/\" version=\"2005-1\">\n"
+        "  <head>\n"
+        "    <meta name=\"dtb:uid\" content=\"urn:uuid:%s\" />\n"
+        "    <meta name=\"dtb:depth\" content=\"0\" />\n"
+        "    <meta name=\"dtb:totalPageCount\" content=\"0\" />\n"
+        "    <meta name=\"dtb:maxPageNumber\" content=\"0\" />\n"
+        "  </head>\n"
+        "<docTitle>\n"
+        "  <text>%s</text>\n"
+        "</docTitle>\n"
+        "<navMap>\n", rawUUID, arguments.title);
+    int i = 1;
+    for ( Node * current = filenameList.head; current != NULL; current = current->next ) {
+        struct SectionTitlePair * spair = current->data;
+        fprintf(toc, "<navPoint id=\"navPoint-%d\" playOrder=\"%d\">\n"
+        "  <navLabel>\n"
+        "    <text>%s</text>\n"
+        "  </navLabel>\n"
+        "  <content src=\"%s\" />\n"
+        "</navPoint>\n", i, i, spair->sectionTitle, spair->sectionPath);
+        i++;
+    }
+    fprintf(toc, "</navMap>\n</ncx>\n");
 
     // Program cleanup
     // Close file streams.
@@ -347,12 +392,16 @@ int main (int argc, char** argv) {
     }
 
     // Free the section path list.
+    
     while ( filenameList.head != NULL ) {
+        free(((struct SectionTitlePair *) filenameList.head->data)->sectionPath);
         free_list_node(&filenameList, filenameList.head, TRUE);
     }
     
     // Print the location of the construction directory if the keep option is specified.
     if ( arguments.keep ) printf("Construction Directory: %s\n", uuid);
+
+    fclose(toc);
 
     // Remove the epub directory.
     if ( !arguments.keep ) rmrf(uuid);
