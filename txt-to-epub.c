@@ -211,7 +211,7 @@ void parse_input (FILE * input, List * sectionList, char * delim) {
             g_string_replace(line, ">", "&gt;", 0);
             g_string_replace(line, "&", "&amp;", 0);
             if ( section->bodyElements->len == 0 ) { // This indicates the first ("title") line.
-                section->title = strcpy(malloc(sizeof(char)*line->len), line->str);
+                section->title = strcpy(malloc(sizeof(char)*(line->len+1)), line->str);
                 g_string_prepend(line, "\t<h2>");
                 g_string_append(line, "</h2>\n");
                 append_list(section->bodyElements, line);
