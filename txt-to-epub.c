@@ -83,6 +83,34 @@ void prepend_list (List * list, void * data) {
     list->len += 1;
 }
 
+void free_list_node (List * list, Node * node, bool freeData) {
+    if ( node == NULL || list == NULL ) return;
+    if ( freeData ) free(node->data);
+    // Reorganize list.
+    if ( list->head == node ) { // Outer node (head)
+        if ( node->next == list->tail && list->tail != NULL ) { // List: | node - head | node->next - tail |
+            list->head = list->tail;
+            list->tail = NULL;
+        } else { // List: | node - head | OR | node - head | node->next | ... | tail |
+            list->head = node->next;
+            if ( list->head != NULL ) list->head->prev = NULL;
+        }
+    } else if ( list->tail == node ) { // Outer node (tail)
+        if ( node->prev == list->head ) { // List: | head | node - tail |
+            list->head->next = NULL;
+            list->tail = NULL;
+        } else { // List: | head | ... | node - tail |
+            list->tail = list->tail->prev;
+            list->tail->next = NULL;
+        }
+    } else { // Inner node: | head | ... | node | ... | tail |
+        // I'm unlinking the node by unreferencing the node from the neighbors and having the neighbors reference each other.
+        ( (Node*) node->prev )->next = node->next;
+        ( (Node*) node->next )->prev = node->prev;
+    }
+    free(node);
+}
+
 int handle_remove (const char* path, const struct stat * sb, int flag, struct FTW * ftwbuf) {
     int ret = remove(path);
     if ( ret ) fprintf(stderr, "%s", path);
@@ -261,6 +289,11 @@ int main (int argc, char** argv) {
         return 1;
     }
     
+    List filenameList; // Will hold the path(s) to the sections ("Text/Section1.xhtml")
+    filenameList.head = NULL;
+    filenameList.tail = NULL;
+    filenameList.len = 0;
+
     int idx = 1;
     // Write the section/chapter files.
     for ( Node * current = sectionList.head ; current != NULL; current = current->next) {
@@ -297,25 +330,28 @@ int main (int argc, char** argv) {
     // Close output stream.
     if ( arguments.outputFile != stdout ) fclose(arguments.outputFile);
 
-
-    Node * current = sectionList.head;
     // Free the sections.
-    while (current != NULL) {
-        Section * section = current->data;
-        Node * bNode = section->bodyElements->head;
-        Node * tmpCurrent = current;
-        while ( bNode != NULL ) {
-            Node * tmp = bNode;
-            bNode = tmp->next;
-            g_string_free(tmp->data, 1);
-            free(tmp);
+    while (sectionList.head != NULL) {
+        while ( ((Section*)sectionList.head->data)->bodyElements->head != NULL ) {
+            g_string_free(((Section*)sectionList.head->data)->bodyElements->head->data, 1);
+            free_list_node(
+                ((Section*)sectionList.head->data)->bodyElements,
+                ((Section*)sectionList.head->data)->bodyElements->head,
+                0
+            );
         }
-        free(section->bodyElements);
-        if (strcmp(section->title, "Default Title") != 0 ) free(section->title);
-        current = current->next;
-        free(tmpCurrent);
+        free(((Section*)sectionList.head->data)->bodyElements);
+        // This check is just to be safe. It really, by design, shouldn't be necessary.
+        if ( strcmp(((Section*)sectionList.head->data)->title, "Default Title") != 0 ) free(((Section*)sectionList.head->data)->title);
+        free_list_node(&sectionList, sectionList.head, 1);
     }
 
+    // Free the section path list.
+    while ( filenameList.head != NULL ) {
+        free_list_node(&filenameList, filenameList.head, TRUE);
+    }
+    
+    // Print the location of the construction directory if the keep option is specified.
     if ( arguments.keep ) printf("Construction Directory: %s\n", uuid);
 
     // Remove the epub directory.
