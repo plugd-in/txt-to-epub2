@@ -1,8 +1,6 @@
 # txt-to-epub2
 Convert a delimited or un-delimited collection of text files into an EPUB file.
 
-## WARNING Project incomplete. Version 0.3.0
-
 ## Build 
 1. Run `cmake .` to generate make files.
 2. Run `make` to compile `txt-to-epub2`.
@@ -99,6 +97,6 @@ $ cat 1.txt <(echo "<------>") 2.txt | txt-to-epub2 -d "<------>" -t "Title"
 - [x] Create construction directories. 
 - [x] Support multiple input files.
 - [x] Generate Table of Contents.
-- [ ] Generate metadata.
+- [x] Generate metadata.
 - [x] Inmplement compression/file creation to output file.
 - [x] More useful output: Chapter titles and/or chapter count.
