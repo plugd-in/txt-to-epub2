@@ -187,13 +187,7 @@ void parse_input (FILE * input, List * sectionList, char * delim) {
     int c;
     while ( (c = fgetc(input)) != EOF ) {
         if ( c != '\n') {
-            if ( c == '<' )
-                g_string_append(line, "&lt;");
-            else if (c == '>' )
-                g_string_append(line, "&gt;");
-            else if ( c == '&' ) 
-                g_string_append(line, "&amp;");
-            else g_string_append_c(line, c);
+            g_string_append_c(line, c);
             emptyLine = 0;
         } else if ( !emptyLine ) { // Ignore multiple new-lines.
             // Handle the delimiter line.
@@ -211,6 +205,9 @@ void parse_input (FILE * input, List * sectionList, char * delim) {
                 emptyLine = 1;
                 continue;
             }
+            g_string_replace(line, "<", "&lt;", 0);
+            g_string_replace(line, ">", "&gt;", 0);
+            g_string_replace(line, "&", "&amp;", 0);
             if ( section->bodyElements->len == 0 ) { // This indicates the first ("title") line.
                 section->title = strcpy(malloc(sizeof(char)*line->len), line->str);
                 g_string_prepend(line, "\t<h2>");
@@ -390,6 +387,9 @@ int main (int argc, char** argv) {
     // Write TOC
     sprintf(path, "%s/OEBPS/toc.ncx", uuid);
     FILE * toc = fopen(path, "w+");
+    // Write TOC
+    sprintf(path, "%s/OEBPS/content.opf", uuid);
+    FILE * content = fopen(path, "w+");
     fprintf(toc, "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
         "<!DOCTYPE ncx PUBLIC \"-//NISO//DTD ncx 2005-1//EN\" \"http://www.daisy.org/z3986/2005/ncx-2005-1.dtd\">\n"
         "<ncx xmlns=\"http://www.daisy.org/z3986/2005/ncx/\" version=\"2005-1\">\n"
@@ -403,6 +403,7 @@ int main (int argc, char** argv) {
         "  <text>%s</text>\n"
         "</docTitle>\n"
         "<navMap>\n", rawUUID, arguments.title);
+
     int i = 1;
     for ( Node * current = filenameList.head; current != NULL; current = current->next ) {
         struct SectionTitlePair * spair = current->data;
@@ -415,6 +416,39 @@ int main (int argc, char** argv) {
         i++;
     }
     fprintf(toc, "</navMap>\n</ncx>\n");
+
+    // Write Metadata
+    fprintf(content, "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+    "<package version=\"2.0\" unique-identifier=\"BookId\" xmlns=\"http://www.idpf.org/2007/opf\">\n"
+    "  <metadata xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:opf=\"http://www.idpf.org/2007/opf\">\n"
+    "    <dc:identifier id=\"BookId\" opf:scheme=\"UUID\">urn:uuid:%s</dc:identifier>\n"
+    "    <dc:language>en</dc:language>\n"
+    "    <dc:title>%s</dc:title>\n"
+    "  </metadata>\n"
+    "  <manifest>\n"
+    "    <item id=\"ncx\" href=\"toc.ncx\" media-type=\"application/x-dtbncx+xml\"/>\n", rawUUID, arguments.title);
+
+    for ( Node * current = filenameList.head; current != NULL; current = current->next ) {
+        struct SectionTitlePair * spair = current->data;
+        fprintf(
+            content,
+            "    <item id=\"%s\" href=\"%s\" media-type=\"application/xhtml+xml\"/>\n",
+            basename(spair->sectionPath), spair->sectionPath
+        );
+    }
+
+    fprintf(content, "  </manifest>\n  <spine toc=\"ncx\">\n");
+
+    for ( Node * current = filenameList.head; current != NULL; current = current->next ) {
+        struct SectionTitlePair * spair = current->data;
+        fprintf(
+            content,
+            "    <itemref idref=\"Section0001.xhtml\"/>",
+            basename(spair->sectionPath)
+        );
+    }
+
+    fprintf(content, "  </spine>\n</package>\n");
 
     // Program cleanup
     // Close file streams.
@@ -451,7 +485,7 @@ int main (int argc, char** argv) {
     if ( arguments.keep ) printf("Construction Directory: %s\n", uuid);
 
     fclose(toc);
-
+    fclose(content);
     create_zip(uuid, arguments.outputFile);
 
     // Remove the epub directory.
