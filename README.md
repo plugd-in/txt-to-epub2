@@ -20,8 +20,10 @@ txt-to-epub - Transform .txt document(s) to an epub document.
                              input file is consumed as a section. Note, the
                              delimiter should be the only line contents.
   -k, --keep                 Keep the construction directory.
-  -o, --output=FILE          Output to FILE instead of Standard Output.
-  -t, --title=TITLE          Title of the document.
+  -o, --output=FILE          Output to FILE. Defaults to ./<Document
+                             Title>.epub
+  -t, --title=TITLE          Title of the document. Defaults to "EPUB Title"
+  -v, --verbose              Include verbose output..
   -?, --help                 Give this help list
       --usage                Give a short usage message
   -V, --version              Print program version
