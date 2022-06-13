@@ -8,6 +8,8 @@
 #include <sys/stat.h>
 #include <uuid/uuid.h>
 #include <stdbool.h>
+#include <zip.h>
+#include <libgen.h>
 
 #define __USE_XOPEN_EXTENDED 1
 #include <ftw.h>
@@ -128,7 +130,7 @@ int rmrf (char * path) { // Recursive remove.
 
 struct arguments {
     List * inputFiles;
-    FILE * outputFile;
+    char * outputFile;
     char * title;
     char * delimiter;
     bool keep;
@@ -140,7 +142,7 @@ static error_t parse_opt (int key, char *arg, struct argp_state * state) {
 
     switch (key) {
         case 'o':
-            arguments->outputFile = fopen(arg, "w+");
+            arguments->outputFile = arg;
             break;
         case 't':
             arguments->title = arg;
@@ -231,9 +233,46 @@ void parse_input (FILE * input, List * sectionList, char * delim) {
     } else g_string_free(line, 1);
 }
 
+static zip_t * zipFile;
+static int rootPath;
+
+int handle_zip_file (const char* path, const struct stat * sb, int flag, struct FTW * ftwbuf) {
+    zip_source_t * sourceFile;
+    if ( flag == FTW_D ) {
+        zip_dir_add(zipFile, path + rootPath, ZIP_FL_ENC_UTF_8);
+    } else if ( flag == FTW_F ) {
+        sourceFile = zip_source_file(zipFile, path, 0, 0);
+        zip_add(zipFile, path+rootPath, sourceFile);
+    }
+    return 0;
+}
+
+/*
+Zip the given path (folder or file) into the given output file.
+*/
+void create_zip (char * pathName, char * outputFile) {
+    zip_source_t * sourceFile;
+    char path[256];
+    rootPath = strlen(realpath(pathName, path));
+    struct stat statbuf;
+    int err;
+    stat(pathName, &statbuf);
+    if ( S_ISDIR(statbuf.st_mode) ) {
+        zipFile = zip_open(outputFile, ZIP_CREATE | ZIP_TRUNCATE, &err);
+        nftw(pathName, handle_zip_file, 10, FTW_DEPTH);
+    } else {
+        zipFile = zip_open(outputFile, ZIP_CREATE | ZIP_TRUNCATE, &err);
+        sourceFile = zip_source_file(zipFile, pathName, 0, 0);
+        zip_add(zipFile, basename(pathName), sourceFile );
+    }
+    zip_close(zipFile);
+}
+
 int main (int argc, char** argv) {
     // Arguments
     struct arguments arguments;
+
+    bool outputFileProvided = FALSE;
     // List of input files.
     List inputList;
     inputList.head = NULL;
@@ -241,14 +280,20 @@ int main (int argc, char** argv) {
     inputList.len = 0;
     arguments.inputFiles = &inputList;
     // Default to STDOUT
-    arguments.outputFile = stdout;
     arguments.title = "EPUB Title";
     arguments.delimiter = NULL; // By default, consume the entire input as a section.
     arguments.keep = FALSE;
     arguments.verbose = FALSE;
+    arguments.outputFile = NULL;
 
     // Argument Parsing
     argp_parse(&argp, argc, argv, 0, 0, &arguments);
+
+    if ( arguments.outputFile == NULL ) {
+        char * outputFile = malloc(sizeof(char)*(strlen(arguments.title)+6));
+        sprintf(outputFile, "%s.epub", arguments.title);
+        arguments.outputFile = outputFile;
+    } else outputFileProvided = TRUE;
 
     if ( inputList.len == 0 ) {
         append_list(&inputList, stdin);
@@ -372,8 +417,6 @@ int main (int argc, char** argv) {
         fclose(file);
     }
 
-    // Close output stream.
-    if ( arguments.outputFile != stdout ) fclose(arguments.outputFile);
 
     // Free the sections.
     while (sectionList.head != NULL) {
@@ -403,10 +446,14 @@ int main (int argc, char** argv) {
 
     fclose(toc);
 
+    create_zip(uuid, arguments.outputFile);
+
     // Remove the epub directory.
     if ( !arguments.keep ) rmrf(uuid);
     free(uuid);
     free(path);
+
+    if ( !outputFileProvided ) free(arguments.outputFile);
 
     printf("Title: %s\n", arguments.title);
     printf("Delimiter: %s\n", arguments.delimiter == NULL ? "No Delimiter" : arguments.delimiter);
