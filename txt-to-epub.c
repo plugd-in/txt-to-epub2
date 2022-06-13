@@ -242,10 +242,10 @@ static int rootPath;
 int handle_zip_file (const char* path, const struct stat * sb, int flag, struct FTW * ftwbuf) {
     zip_source_t * sourceFile;
     if ( flag == FTW_D ) {
-        zip_dir_add(zipFile, path + rootPath, ZIP_FL_ENC_UTF_8);
+        zip_dir_add(zipFile, path + rootPath + 1, ZIP_FL_ENC_UTF_8);
     } else if ( flag == FTW_F ) {
         sourceFile = zip_source_file(zipFile, path, 0, 0);
-        zip_add(zipFile, path+rootPath, sourceFile);
+        zip_add(zipFile, path+rootPath + 1, sourceFile);
     }
     return 0;
 }
@@ -338,6 +338,9 @@ int main (int argc, char** argv) {
         sprintf(path, "%s/OEBPS/Styles", uuid);
         // Make /tmp/uuid/OEBPS/Styles
         mkdir(path, 0700);
+        sprintf(path, "%s/META-INF", uuid);
+        // Make /tmp/uuid/META-INF
+        mkdir(path, 0700);
     } else {
         fprintf(stderr, "Error creating the EPub Document Directory");
         return 1;
@@ -387,7 +390,7 @@ int main (int argc, char** argv) {
     // Write TOC
     sprintf(path, "%s/OEBPS/toc.ncx", uuid);
     FILE * toc = fopen(path, "w+");
-    // Write TOC
+    // Write content
     sprintf(path, "%s/OEBPS/content.opf", uuid);
     FILE * content = fopen(path, "w+");
     fprintf(toc, "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
@@ -403,6 +406,14 @@ int main (int argc, char** argv) {
         "  <text>%s</text>\n"
         "</docTitle>\n"
         "<navMap>\n", rawUUID, arguments.title);
+    // Write Meta
+    sprintf(path, "%s/META-INF/container.xml", uuid);
+    FILE * meta = fopen(path, "w+");
+    // Write mime.
+    sprintf(path, "%s/mimetype", uuid);
+    FILE * mime = fopen(path, "w+");
+
+    fprintf(mime, "application/epub+zip\n");
 
     int i = 1;
     for ( Node * current = filenameList.head; current != NULL; current = current->next ) {
@@ -417,7 +428,7 @@ int main (int argc, char** argv) {
     }
     fprintf(toc, "</navMap>\n</ncx>\n");
 
-    // Write Metadata
+    // Write content links.
     fprintf(content, "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
     "<package version=\"2.0\" unique-identifier=\"BookId\" xmlns=\"http://www.idpf.org/2007/opf\">\n"
     "  <metadata xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:opf=\"http://www.idpf.org/2007/opf\">\n"
@@ -443,12 +454,20 @@ int main (int argc, char** argv) {
         struct SectionTitlePair * spair = current->data;
         fprintf(
             content,
-            "    <itemref idref=\"Section0001.xhtml\"/>",
+            "    <itemref idref=\"%s\"/>",
             basename(spair->sectionPath)
         );
     }
 
     fprintf(content, "  </spine>\n</package>\n");
+
+    // Write metadata.
+    fprintf(meta, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+    "<container version=\"1.0\" xmlns=\"urn:oasis:names:tc:opendocument:xmlns:container\">\n"
+    "    <rootfiles>"
+    "        <rootfile full-path=\"OEBPS/content.opf\" media-type=\"application/oebps-package+xml\"/>\n"
+    "   </rootfiles>\n"
+    "</container>\n");
 
     // Program cleanup
     // Close file streams.
@@ -486,6 +505,8 @@ int main (int argc, char** argv) {
 
     fclose(toc);
     fclose(content);
+    fclose(meta);
+    fclose(mime);
     create_zip(uuid, arguments.outputFile);
 
     // Remove the epub directory.
